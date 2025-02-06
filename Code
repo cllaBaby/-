@@ -1,0 +1,191 @@
+import tkinter as tk #Модуль для создания GUI
+from tkinter import messagebox, ttk #Подключение дополнительных виджетов и диалоговых окон
+from tkcalendar import Calendar #Модуль для использования календаря
+from datetime import datetime, timedelta #Для работы с датами и временем
+import winsound  #Для звукового уведомления на Windows
+
+#Создаем главное окно приложения
+root = tk.Tk()
+root.title("Ежедневник") #Устанавливаем заголовок окна
+root.geometry("1046x855") #Размеры окна
+root.iconbitmap("Eje.ico")  # Установка иконки
+
+#Установка темы оформления и шрифта для всех виджетов
+root.style = ttk.Style()
+root.style.theme_use("clam") #Используем тему "clam"
+root.option_add("*Font", "Arial 12") #Устанавливаем шрифт по умолчанию
+
+#Переменные для хранения задач и времени напоминания
+tasks = [] #Список для хранения задач
+reminder_time = datetime.now()  #Время напоминания (по умолчанию текущее)
+
+
+#Функция добавления задачи
+def add_task():
+    task = task_entry.get() #Получаем текст задачи
+    deadline = deadline_entry.get() #Получаем дату дедлайна
+    priority = priority_var.get() #Получаем уровень приоритета задачи
+
+    if task and deadline and reminder_time: #Проверяем заполнение всех полей
+        #Создаём словарь с деталями задачи
+        task_details = {"task": task, "deadline": deadline, "priority": priority, "reminder_time": reminder_time}
+        tasks.append(task_details) #Добавляем задачу в список
+        update_task_list() #Обновляем отображение списка задач
+        task_entry.delete(0, tk.END) #Очищаем поле ввода задачи
+        deadline_entry.delete(0, tk.END) #Очищаем поле ввода дедлайна
+
+        #Рассчитываем время напоминания
+        reminder_datetime = reminder_time
+        task_datetime = datetime.strptime(deadline, "%Y-%m-%d") #Конвертируем строку дедлайна в объект datetime
+        reminder_datetime = task_datetime.replace(hour=reminder_datetime.hour, minute=reminder_datetime.minute, second=0) #Устанавливаем дату напоминания (сегодня или на день дедлайна)
+
+        #Если время напоминания уже прошло, то напоминание будет завтра
+        if reminder_datetime < datetime.now():
+            reminder_datetime += timedelta(days=1)
+
+        delay = (reminder_datetime - datetime.now()).total_seconds() * 1000  #Рассчитываем задержку в миллисекундах
+        root.after(int(delay), show_reminder, task)  #вызов напоминания через delay мс
+
+    else:
+        messagebox.showwarning("Ошибка", "Пожалуйста, заполните все поля.") #Показываем предупреждение при ошибке
+
+
+#Функция обновления списка задач
+def update_task_list():
+    task_listbox.delete(0, tk.END) #Очищаем список задач
+    for task in tasks:
+        task_text = f"{task['task']} | Дедлайн: {task['deadline']} | Приоритет: {task['priority']}"
+        if task['priority'] == "Высокий": #Если приоритет высокий
+            task_listbox.insert(tk.END, task_text) #Добавляем задачу в список
+            task_listbox.itemconfig(tk.END, {'bg': 'red'})  #Выделяем цветом
+        else:
+            task_listbox.insert(tk.END, task_text)
+
+
+#Функция удаления задачи
+def delete_task():
+    try:
+        selected_task_index = task_listbox.curselection()[0] #Индекс выбранной задачи
+        del tasks[selected_task_index] #Удаляем задачу из списка
+        update_task_list() #Обновляем отображение списка
+    except IndexError: #Если задача не выбрана
+        messagebox.showwarning("Ошибка", "Выберите задачу для удаления.")
+
+
+#Функция поиска задачи
+def search_task():
+    search_text = search_entry.get().lower() #Получаем текст для поиска
+    task_listbox.delete(0, tk.END) #Очищаем список задач
+    for task in tasks:
+        if search_text in task['task'].lower(): #Проверяем соответствие задачи поисковому запросу
+            task_listbox.insert(tk.END, f"{task['task']} | Дедлайн: {task['deadline']} | Приоритет: {task['priority']}")
+
+
+#Функция отображения текущего времени
+def update_time():
+    current_time = datetime.now().strftime("%H:%M:%S") #Получаем текущее время в формате ЧЧ:ММ:СС
+    time_label.config(text=f"Текущее время: {current_time}") #Обновляем текст метки
+    root.after(1000, update_time)  #обновляем время каждые 1000 мс
+
+
+#Функция для выбора даты из календаря
+def get_date_from_calendar():
+    selected_date = cal.get_date() #Получаем выбранную дату
+    deadline_entry.delete(0, tk.END) #Очищаем поле ввода дедлайна
+    deadline_entry.insert(0, selected_date) #Вставляем выбранную дату
+
+
+#Функция для отображения уведомления
+def show_reminder(task):
+    messagebox.showinfo("Напоминание", f"Время выполнить задачу: {task}") #Показываем уведомление
+    play_sound()  #Воспроизводим звук
+
+
+#Функция воспроизведения звука
+def play_sound():
+    #Воспроизводим звуковой сигнал (на Windows)
+    winsound.Beep(500, 500)  #Генерируем звук частотой 500 Гц продолжительностью 500 мс
+
+
+#Функция для изменения времени напоминания
+def adjust_reminder_time(hours_change=0, minutes_change=0):
+    global reminder_time
+    reminder_time += timedelta(hours=hours_change, minutes=minutes_change) #Изменяем время напоминания
+    reminder_time_label.config(text=f"Время напоминания: {reminder_time.strftime('%H:%M')}") #Обновляем метку времени
+
+
+#Виджеты
+input_frame = tk.Frame(root)
+input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+task_label = tk.Label(input_frame, text="Введите задачу:")
+task_label.grid(row=0, column=0, padx=10, pady=5)
+task_entry = tk.Entry(input_frame, width=40)
+task_entry.grid(row=0, column=1, padx=10, pady=5)
+
+deadline_label = tk.Label(input_frame, text="Введите дедлайн (гггг-мм-дд):")
+deadline_label.grid(row=1, column=0, padx=10, pady=5)
+deadline_entry = tk.Entry(input_frame, width=40)
+deadline_entry.grid(row=1, column=1, padx=10, pady=5)
+
+priority_label = tk.Label(input_frame, text="Выберите приоритет:")
+priority_label.grid(row=2, column=0, padx=10, pady=5)
+priority_var = tk.StringVar(value="Средний")
+priority_menu = ttk.OptionMenu(input_frame, priority_var, "Высокий", "Средний", "Низкий")
+priority_menu.grid(row=2, column=1, padx=10, pady=5)
+
+reminder_time_label = tk.Label(input_frame, text="Выберите время напоминания:")
+reminder_time_label.grid(row=3, column=0, padx=10, pady=5)
+
+#Кнопки для регулировки времени
+time_buttons_frame = tk.Frame(input_frame)
+time_buttons_frame.grid(row=3, column=1, padx=10, pady=5)
+
+add_hour_button = ttk.Button(time_buttons_frame, text="+1 час", command=lambda: adjust_reminder_time(1, 0))
+add_hour_button.grid(row=0, column=0, padx=5)
+
+subtract_hour_button = ttk.Button(time_buttons_frame, text="-1 час", command=lambda: adjust_reminder_time(-1, 0))
+subtract_hour_button.grid(row=0, column=1, padx=5)
+
+add_minute_button = ttk.Button(time_buttons_frame, text="+1 минута", command=lambda: adjust_reminder_time(0, 1))
+add_minute_button.grid(row=0, column=2, padx=5)
+
+subtract_minute_button = ttk.Button(time_buttons_frame, text="-1 минута", command=lambda: adjust_reminder_time(0, -1))
+subtract_minute_button.grid(row=0, column=3, padx=5)
+
+#Кнопка для добавления задачи
+add_button = ttk.Button(root, text="Добавить задачу", command=add_task)
+add_button.grid(row=4, column=0, columnspan=2, pady=10, sticky="ew")
+
+#Список задач
+task_listbox = tk.Listbox(root, width=80, height=10)
+task_listbox.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
+
+delete_button = ttk.Button(root, text="Удалить задачу", command=delete_task)
+delete_button.grid(row=8, column=0, padx=10, pady=5, sticky="ew")
+
+search_label = tk.Label(root, text="Поиск задачи:")
+search_label.grid(row=9, column=0, padx=10, pady=5)
+search_entry = tk.Entry(root, width=40)
+search_entry.grid(row=9, column=1, padx=10, pady=5)
+
+search_button = ttk.Button(root, text="Искать", command=search_task)
+search_button.grid(row=10, column=0, columnspan=2, pady=10, sticky="ew")
+
+cal_label = tk.Label(root, text="Выберите дату:")
+cal_label.grid(row=11, column=0, padx=10, pady=5)
+
+cal = Calendar(root, selectmode="day", date_pattern="yyyy-mm-dd", font="Arial 12", width=20, height=5)
+cal.grid(row=11, column=1, padx=10, pady=5)
+
+cal_button = ttk.Button(root, text="Выбрать дату", command=get_date_from_calendar)
+cal_button.grid(row=12, column=0, columnspan=2, pady=10, sticky="ew")
+
+time_label = tk.Label(root, text="Текущее время: ")
+time_label.grid(row=13, column=0, columnspan=2, pady=5)
+
+#Обновление времени
+update_time()
+
+#Запуск приложения
+root.mainloop()
